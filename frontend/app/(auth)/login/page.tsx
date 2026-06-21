@@ -22,6 +22,29 @@ const FIELD_STYLE: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+const DEMO_PASSWORD = "demo123";
+
+const DEMO_ACCOUNTS = [
+  {
+    role: "Employee",
+    email: "elira@acme.test",
+    description: "Marketplace, Bora AI, history, Wrapped",
+    accent: "#635bff",
+  },
+  {
+    role: "Employer",
+    email: "dritan@acme.test",
+    description: "Compliance, team quests, insights, employees",
+    accent: "#010110",
+  },
+  {
+    role: "Provider",
+    email: "provider@perx.test",
+    description: "Manage offers, scan vouchers, earnings",
+    accent: "#2d6a4f",
+  },
+] as const;
+
 export default function LoginPage() {
   const router = useRouter();
   const setSession = useSessionStore((s) => s.setSession);
@@ -29,24 +52,49 @@ export default function LoginPage() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [demoLoading, setDemoLoading] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
+  const performLogin = async (loginEmail: string, loginPassword: string) => {
+    const res = await apiPost<{ token: string; user: UserDTO }>("/auth/login", {
+      email: loginEmail.trim().toLowerCase(),
+      password: loginPassword,
+    });
+    setSession(res.token, res.user);
+    router.replace(primaryRoleHome(res.user.roles));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const res = await apiPost<{ token: string; user: UserDTO }>("/auth/login", {
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      setSession(res.token, res.user);
-      router.replace(primaryRoleHome(res.user.roles));
+      await performLogin(email, password);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoLogin = async (demoEmail: string) => {
+    setError(null);
+    setEmail(demoEmail);
+    setPassword(DEMO_PASSWORD);
+    setDemoLoading(demoEmail);
+    try {
+      await performLogin(demoEmail, DEMO_PASSWORD);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDemoLoading(null);
+    }
+  };
+
+  const fillDemo = (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword(DEMO_PASSWORD);
+    setError(null);
   };
 
   return (
@@ -177,11 +225,157 @@ export default function LoginPage() {
         )}
 
         <div style={{ marginTop: "8px" }}>
-          <Button type="submit" variant="primary" disabled={loading} style={{ width: "100%" }}>
+          <Button type="submit" variant="primary" disabled={loading || demoLoading !== null} style={{ width: "100%" }}>
             {loading ? "Logging in..." : "Log in."}
           </Button>
         </div>
       </form>
+
+      <section
+        aria-label="Demo accounts for reviewers"
+        style={{
+          marginTop: "40px",
+          padding: "20px",
+          borderRadius: "12px",
+          border: "1px solid rgba(99,91,255,0.2)",
+          background: "linear-gradient(180deg, rgba(99,91,255,0.06) 0%, rgba(255,255,255,0.9) 100%)",
+        }}
+      >
+        <p
+          style={{
+            fontFamily: "var(--font-inter), sans-serif",
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            color: "#635bff",
+            margin: "0 0 6px",
+          }}
+        >
+          Demo access
+        </p>
+        <p
+          style={{
+            fontFamily: "var(--font-inter), sans-serif",
+            fontSize: "14px",
+            lineHeight: 1.5,
+            color: "#010110",
+            margin: "0 0 4px",
+          }}
+        >
+          Password for all accounts:{" "}
+          <code
+            style={{
+              fontFamily: "ui-monospace, monospace",
+              fontSize: "13px",
+              padding: "2px 8px",
+              borderRadius: "6px",
+              backgroundColor: "rgba(1,1,16,0.06)",
+            }}
+          >
+            {DEMO_PASSWORD}
+          </code>
+        </p>
+        <p
+          style={{
+            fontFamily: "var(--font-inter), sans-serif",
+            fontSize: "13px",
+            color: "#73737c",
+            margin: "0 0 16px",
+          }}
+        >
+          One-click into each portal — employee, employer, and provider.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {DEMO_ACCOUNTS.map((account) => {
+            const busy = demoLoading === account.email;
+            return (
+              <div
+                key={account.email}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  padding: "14px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(1,1,16,0.1)",
+                  backgroundColor: "#ffffff",
+                }}
+              >
+                <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-inter), sans-serif",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        color: account.accent,
+                      }}
+                    >
+                      {account.role}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: "ui-monospace, monospace",
+                      fontSize: "13px",
+                      color: "#010110",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    {account.email}
+                  </p>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-inter), sans-serif",
+                      fontSize: "12px",
+                      color: "#73737c",
+                      margin: 0,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {account.description}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => fillDemo(account.email)}
+                    disabled={loading || demoLoading !== null}
+                    style={{
+                      fontFamily: "var(--font-inter), sans-serif",
+                      fontSize: "13px",
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(1,1,16,0.15)",
+                      backgroundColor: "#ffffff",
+                      color: "#010110",
+                      cursor: loading || demoLoading !== null ? "not-allowed" : "pointer",
+                      opacity: loading || demoLoading !== null ? 0.6 : 1,
+                    }}
+                  >
+                    Fill
+                  </button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={loading || demoLoading !== null}
+                    onClick={() => void handleDemoLogin(account.email)}
+                    style={{ minWidth: "100px" }}
+                  >
+                    {busy ? "…" : "Enter"}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <div
         style={{
