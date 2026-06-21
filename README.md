@@ -206,7 +206,7 @@ flowchart LR
 2. In [Render](https://render.com), **New → Blueprint** and select `render.yaml`,  
    **or** create a **Web Service** manually:
    - **Root directory:** `backend`
-   - **Build:** `npm install && npm run build`
+   - **Build:** `npm install --include=dev && npm run build`
    - **Start:** `npm start`
    - **Health check path:** `/healthz`
 3. Set environment variables:
