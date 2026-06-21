@@ -1,0 +1,320 @@
+.page {
+  min-height: 100vh;
+  background: #0a0a12;
+  padding: 0 0 48px;
+}
+
+.inner {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 24px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  margin-bottom: 8px;
+}
+
+.back:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.brand {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.year {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 28px 24px;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 16px 40px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  animation: cardEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.cardDelay0 { animation-delay: 0s; }
+.cardDelay1 { animation-delay: 0.07s; }
+.cardDelay2 { animation-delay: 0.14s; }
+.cardDelay3 { animation-delay: 0.21s; }
+.cardDelay4 { animation-delay: 0.28s; }
+.cardDelay5 { animation-delay: 0.35s; }
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cardGlow {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.cardEyebrow {
+  position: relative;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 10px;
+}
+
+.cardTitle {
+  position: relative;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(36px, 9vw, 48px);
+  font-weight: 400;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin: 0;
+}
+
+.cardSubtitle {
+  position: relative;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.78);
+  margin: 12px 0 0;
+  max-width: 32ch;
+}
+
+.cardBigNumber {
+  position: relative;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(40px, 10vw, 52px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin: 4px 0 0;
+}
+
+.cardHint {
+  position: relative;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 8px 0 0;
+}
+
+.cardPersona {
+  background: linear-gradient(145deg, #2d1b69 0%, #6b2d5c 45%, #e84393 100%);
+}
+
+.cardPersona .cardGlow {
+  top: -60px;
+  right: -40px;
+  background: #ff6bcb;
+}
+
+.cardSpend {
+  background: linear-gradient(145deg, #0d3b2e 0%, #1a6b4a 50%, #3dd68c 100%);
+}
+
+.cardSpend .cardGlow {
+  top: -50px;
+  left: -30px;
+  background: #3dd68c;
+}
+
+.cardCategory {
+  background: linear-gradient(145deg, #3d2208 0%, #a85c14 55%, #f5a623 100%);
+}
+
+.cardCategory .cardGlow {
+  bottom: -40px;
+  right: -20px;
+  background: #ffd166;
+}
+
+.cardRedeem {
+  background: linear-gradient(145deg, #0c1f4a 0%, #1e4a8c 55%, #4d9fff 100%);
+}
+
+.cardRedeem .cardGlow {
+  top: -30px;
+  right: -50px;
+  background: #6eb6ff;
+}
+
+.cardRange {
+  background: linear-gradient(145deg, #1a0a2e 0%, #4a1a6b 50%, #9b59f5 100%);
+  min-height: 200px;
+}
+
+.cardRange .cardGlow {
+  bottom: -60px;
+  left: 20%;
+  background: #c084fc;
+}
+
+.chips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.chip {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+.chipActive {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a0a2e;
+  border-color: transparent;
+}
+
+.ctaCard {
+  border-radius: 20px;
+  padding: 22px 24px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+  opacity: 0;
+  animation: cardEnter 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.35s;
+}
+
+.ctaText {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0;
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 100px;
+  background: #ffffff;
+  color: #0a0a12;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.ctaButton:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+}
+
+.skeleton {
+  height: 520px;
+  border-radius: 20px;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: wrappedShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes wrappedShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  border-radius: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.empty h2 {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 28px;
+  color: #ffffff;
+  margin: 0 0 10px;
+}
+
+.empty p {
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.emoji {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 8px;
+  display: block;
+}

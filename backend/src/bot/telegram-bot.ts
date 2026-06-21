@@ -185,10 +185,12 @@ export async function initTelegramBot(): Promise<TelegramBot | null> {
     return botInstance;
   }
 
-  pollingBot = new TelegramBot(env.TELEGRAM_BOT_TOKEN, { polling: true });
-  botInstance = pollingBot;
+  pollingBot = new TelegramBot(env.TELEGRAM_BOT_TOKEN);
   attachBotHandlers(pollingBot);
-  console.log("[telegram] polling mode started");
+  await pollingBot.deleteWebHook({ drop_pending_updates: false });
+  await pollingBot.startPolling();
+  botInstance = pollingBot;
+  console.log("[telegram] polling mode started (webhook cleared for local dev)");
   return pollingBot;
 }
 

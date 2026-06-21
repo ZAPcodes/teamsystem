@@ -27,7 +27,7 @@ const TOPIC_RULES: Array<{
     label: "food"
   },
   {
-    pattern: /\b(spa|massage|gym|yoga|sauna|wellness|health|clinic|nutrition)\b/i,
+    pattern: /\b(spa|massage|gym|yoga|sauna|wellness|health|clinic|nutrition|relax|calm|reset)\b/i,
     category: "wellness",
     searchTerms: ["spa", "massage", "gym", "yoga", "sauna", "health", "nutrition"],
     label: "wellness"
@@ -42,6 +42,12 @@ const TOPIC_RULES: Array<{
     pattern: /\b(learn|learning|course|class|language|italian|workshop|school)\b/i,
     category: "learning",
     searchTerms: ["course", "language", "italian", "workshop", "class"],
+    label: "learning"
+  },
+  {
+    pattern: /\b(pottery|ceramic|ceramics|paint|painting|art class|craft)\b/i,
+    category: "learning",
+    searchTerms: ["pottery", "ceramic", "art", "craft", "workshop", "class"],
     label: "learning"
   },
   {

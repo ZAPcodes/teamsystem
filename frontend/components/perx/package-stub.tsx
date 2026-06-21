@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { X } from "@/components/icons";
 import { formatMoney } from "@/lib/utils";
 import type { PackageLine } from "@/lib/store/package";
 
@@ -27,6 +28,8 @@ interface StubPackageProps {
   qrPayload?: string;
   code?: string;
   status?: StubStatus;
+  /** Draft builder only — enables per-line remove on the stub. */
+  onRemoveLine?: (lineId: string) => void;
 }
 
 type PackageStubProps = StubVoucherProps | StubPackageProps;
@@ -88,12 +91,18 @@ function SealDot({ status }: { status: StubStatus }) {
 }
 
 // ---- Package line rows ------------------------------------------
-function PackageLineRow({ line }: { line: PackageLine }) {
+function PackageLineRow({
+  line,
+  onRemove,
+}: {
+  line: PackageLine;
+  onRemove?: (lineId: string) => void;
+}) {
   return (
     <div
       style={{
         display: "flex",
-        alignItems: "baseline",
+        alignItems: "center",
         justifyContent: "space-between",
         gap: "8px",
       }}
@@ -122,18 +131,46 @@ function PackageLineRow({ line }: { line: PackageLine }) {
           {line.offerTitle}
         </span>
       </div>
-      <span
-        className="tabular-nums"
-        style={{
-          fontFamily: "var(--font-inter), sans-serif",
-          fontWeight: 500,
-          fontSize: "12px",
-          color: "#010110",
-          flexShrink: 0,
-        }}
-      >
-        {formatMoney(line.price, "ALL")}
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+        <span
+          className="tabular-nums"
+          style={{
+            fontFamily: "var(--font-inter), sans-serif",
+            fontWeight: 500,
+            fontSize: "12px",
+            color: "#010110",
+          }}
+        >
+          {formatMoney(line.price, "ALL")}
+        </span>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove(line.id);
+            }}
+            aria-label={`Remove ${line.offerTitle}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "24px",
+              height: "24px",
+              borderRadius: "100px",
+              border: "1px solid rgba(1,1,16,0.15)",
+              backgroundColor: "transparent",
+              color: "#73737c",
+              cursor: "pointer",
+              padding: 0,
+              flexShrink: 0,
+            }}
+          >
+            <X size={12} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -146,6 +183,9 @@ export function PackageStub(props: PackageStubProps) {
   const canShowQr = (status === "approved" || status === "settled") && Boolean(qrPayload && code);
 
   const isVoucher = props.variant === "voucher";
+  const packageProps = !isVoucher ? (props as StubPackageProps) : null;
+  const canRemoveLines =
+    packageProps?.status === "draft" && Boolean(packageProps.onRemoveLine);
 
   let label: string;
   let title: string;
@@ -237,8 +277,8 @@ export function PackageStub(props: PackageStubProps) {
           {subtitle}
         </p>
 
-        {/* Package lines (multi-line variant only) */}
-        {!isVoucher && (props as StubPackageProps).lines.length > 1 && (
+        {/* Package lines (multi-line variant only, or editable draft) */}
+        {!isVoucher && packageProps && (packageProps.lines.length > 1 || canRemoveLines) && (
           <div
             style={{
               marginTop: "8px",
@@ -249,8 +289,12 @@ export function PackageStub(props: PackageStubProps) {
               borderTop: "1px solid rgba(1,1,16,0.08)",
             }}
           >
-            {(props as StubPackageProps).lines.map((line) => (
-              <PackageLineRow key={line.id} line={line} />
+            {packageProps.lines.map((line) => (
+              <PackageLineRow
+                key={line.id}
+                line={line}
+                onRemove={canRemoveLines ? packageProps.onRemoveLine : undefined}
+              />
             ))}
           </div>
         )}

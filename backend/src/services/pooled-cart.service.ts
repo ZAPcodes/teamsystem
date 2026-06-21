@@ -13,7 +13,7 @@ import { PooledCart } from "../models/PooledCart.js";
 import { User } from "../models/User.js";
 import { Voucher } from "../models/Voucher.js";
 import { toVoucherDTO } from "../mappers/package.mapper.js";
-import { settlePackage } from "./ledger.service.js";
+import { ensureCompanyWalletFunded, settlePackage } from "./ledger.service.js";
 
 type PooledCartDTO = z.infer<typeof PooledCartSchema>;
 
@@ -144,9 +144,11 @@ async function lockPooledCart(cartId: string) {
   if (cart.committedTotal < cart.targetPrice) return null;
 
   const company = await Company.findById(cart.companyId).lean();
-  if (!company || company.walletBalance < cart.targetPrice) {
-    throw new ApiError(400, "COMPANY_WALLET_LOW", "Employer wallet cannot settle this group pool right now");
+  if (!company) {
+    throw new ApiError(400, "COMPANY_NOT_FOUND", "Employer company not found");
   }
+
+  await ensureCompanyWalletFunded(cart.companyId.toString(), cart.targetPrice, cart.currency);
 
   for (const contribution of cart.contributions) {
     await finalizeHold(contribution.userId.toString(), cart.companyId.toString(), contribution.amount);

@@ -1,6 +1,5 @@
 import { ApiError } from "../http/ApiError.js";
 import { env } from "../config/env.js";
-import { Company } from "../models/Company.js";
 import { EmployeeAllowance } from "../models/EmployeeAllowance.js";
 import { Offer } from "../models/Offer.js";
 import { Provider } from "../models/Provider.js";
@@ -9,13 +8,10 @@ import { User } from "../models/User.js";
 import { createDraftPackage, submitPackage } from "./package.service.js";
 import { evaluateClaimCompliance } from "./compliance.service.js";
 import {
-  CATEGORY_WALLET_LABELS,
-  deductCategoryBalance,
-  ensureTelegramWalletInitialized,
-  formatWalletLines,
-  persistTelegramWallet,
+  formatUnifiedBalance,
+  getUnifiedAllowance,
   type CategoryKey,
-  type CategoryWalletSnapshot
+  type UnifiedAllowanceSnapshot
 } from "./telegram-wallet.service.js";
 import type { PerkCategory } from "./telegram-topic.service.js";
 import { inferTopicFromMessage } from "./telegram-topic.service.js";
@@ -74,9 +70,23 @@ export async function linkTelegramChat(chatId: string, code: string) {
   user.telegramChatId = chatId;
   user.telegramLinkedAt = new Date();
   link.usedAt = new Date();
-  await Promise.all([user.save(), link.save()]);
 
-  await ensureTelegramWalletInitialized(user._id.toString());
+  await Promise.all([
+    user.save(),
+    link.save(),
+    User.updateOne(
+      { _id: user._id },
+      {
+        $unset: {
+          telegramFoodBalance: 1,
+          telegramWellnessBalance: 1,
+          telegramLifestyleBalance: 1,
+          telegramTravelBalance: 1,
+          telegramLearningBalance: 1
+        }
+      }
+    )
+  ]);
 
   return { name: user.name };
 }
@@ -86,26 +96,25 @@ export async function findUserByTelegramChat(chatId: string) {
 }
 
 export async function getBalanceMessage(userId: string) {
-  const snapshot = await ensureTelegramWalletInitialized(userId);
-  if (!snapshot) {
+  const allowance = await getUnifiedAllowance(userId);
+  if (!allowance) {
     return "I couldn't load your wallet right now. Try again from the Perx web app.";
   }
 
-  const lines = formatWalletLines(snapshot);
-  return `You have ${lines}. Need a recommendation?`;
+  return `You have ${formatUnifiedBalance(allowance)}. Need a recommendation?`;
 }
 
 export async function getRecommendationMessage(
   userId: string,
   input?: { category?: PerkCategory | null; searchTerms?: string[]; label?: string | null; userMessage?: string }
 ) {
-  const snapshot = await ensureTelegramWalletInitialized(userId);
-  if (!snapshot) {
+  const allowance = await getUnifiedAllowance(userId);
+  if (!allowance) {
     return "I couldn't load your wallet right now. Try again from the Perx web app.";
   }
 
   const fromMessage = input?.userMessage ? inferTopicFromMessage(input.userMessage) : null;
-  const category = input?.category ?? fromMessage?.category ?? pickTopWalletCategory(snapshot);
+  const category = resolveOfferCategory(input?.category ?? fromMessage?.category);
   const searchTerms = [...(input?.searchTerms ?? []), ...(fromMessage?.searchTerms ?? [])];
   const label = input?.label ?? fromMessage?.label;
 
@@ -132,31 +141,26 @@ export async function getRecommendationMessage(
     if (fallbackOffers.length === 0) {
       return "I don't see matching perks in your catalog right now — browse the marketplace in the app.";
     }
-    return formatRecommendationReply(fallbackOffers, fallbackCategory, snapshot, label);
+    return formatRecommendationReply(fallbackOffers, fallbackCategory, allowance, label);
   }
 
-  return formatRecommendationReply(picks, category, snapshot, label);
+  return formatRecommendationReply(picks, category, allowance, label);
 }
 
-function pickTopWalletCategory(snapshot: CategoryWalletSnapshot): CategoryKey {
-  const entries = (Object.keys(CATEGORY_WALLET_LABELS) as CategoryKey[]).map((key) => ({
-    key,
-    amount: snapshot[key]
-  }));
-  entries.sort((a, b) => b.amount - a.amount);
-  return entries[0]?.amount > 0 ? entries[0].key : "food";
+function resolveOfferCategory(category?: PerkCategory | null): CategoryKey {
+  return category ?? "lifestyle";
 }
 
 function formatRecommendationReply(
   offers: Array<{ title: string; price: number }>,
   category: CategoryKey,
-  snapshot: CategoryWalletSnapshot,
+  allowance: UnifiedAllowanceSnapshot,
   label: string | null | undefined
 ) {
-  const walletLabel = CATEGORY_WALLET_LABELS[category];
-  const balance = snapshot[category];
   const topicLabel = label ? `${label} ` : "";
-  const lines = offers.map((offer) => `• ${offer.title} — ${offer.price.toLocaleString("en-GB")} ALL`);
+  const lines = offers.map(
+    (offer) => `• ${offer.title} — ${offer.price.toLocaleString("en-GB")} ${allowance.currency}`
+  );
 
   const cta =
     category === "food"
@@ -166,7 +170,7 @@ function formatRecommendationReply(
   return [
     `Here are some ${topicLabel}perks:`,
     lines.join("\n"),
-    `You have ${balance.toLocaleString("en-GB")} ALL in ${walletLabel}. ${cta}`
+    `You have ${formatUnifiedBalance(allowance)}. ${cta}`
   ].join("\n");
 }
 
@@ -227,8 +231,7 @@ async function findLunchOffer(amount: number, venue: string) {
     .sort((a, b) => Math.abs(a.price - amount) - Math.abs(b.price - amount))[0];
 }
 
-function purchaseCaption(category: CategoryKey, offerTitle: string, remaining: number) {
-  const walletLabel = CATEGORY_WALLET_LABELS[category];
+function purchaseCaption(offerTitle: string, remaining: number, currency: string, category: CategoryKey) {
   const venueHint =
     category === "food"
       ? "Show this QR code to the waiter."
@@ -236,7 +239,7 @@ function purchaseCaption(category: CategoryKey, offerTitle: string, remaining: n
         ? "Show this QR code at check-in."
         : "Show this QR code at the venue.";
 
-  return `Done! ${offerTitle} is ready. ${venueHint} ${remaining.toLocaleString("en-GB")} ALL remaining in ${walletLabel}.`;
+  return `Done! ${offerTitle} is ready. ${venueHint} ${remaining.toLocaleString("en-GB")} ${currency} remaining in your wallet.`;
 }
 
 export async function purchasePerkViaTelegram(
@@ -286,21 +289,6 @@ export async function purchasePerkViaTelegram(
     throw new ApiError(400, "INSUFFICIENT_ALLOWANCE", "Not enough allowance for this perk");
   }
 
-  const wallet = (await ensureTelegramWalletInitialized(userId))!;
-  const nextWallet = deductCategoryBalance(wallet, walletCategory, price);
-  if (!nextWallet) {
-    throw new ApiError(
-      400,
-      "INSUFFICIENT_CATEGORY_BALANCE",
-      `Not enough ${CATEGORY_WALLET_LABELS[walletCategory]} wallet balance`
-    );
-  }
-
-  const company = await Company.findById(user.companyId).lean();
-  if (!company || company.walletBalance < price) {
-    throw new ApiError(400, "INSUFFICIENT_COMPANY_BALANCE", "Employer wallet cannot cover this perk right now");
-  }
-
   const draft = await createDraftPackage(userId, user.companyId.toString(), [String(offer._id)], "manual");
   const submitted = await submitPackage(draft.id, userId, { shareToFeed: false });
   const voucher = submitted.vouchers[0];
@@ -308,17 +296,19 @@ export async function purchasePerkViaTelegram(
     throw new ApiError(500, "VOUCHER_NOT_ISSUED", "Could not issue voucher");
   }
 
-  await persistTelegramWallet(userId, nextWallet);
+  const refreshed = await getUnifiedAllowance(userId);
+  const remaining = refreshed?.available ?? 0;
+  const currency = refreshed?.currency ?? offer.currency;
 
   return {
     offerTitle: offer.title,
     price,
-    currency: offer.currency,
+    currency,
     walletCategory,
-    walletRemaining: nextWallet[walletCategory],
+    walletRemaining: remaining,
     voucherCode: voucher.code,
     qrPayload: voucher.qrPayload,
-    caption: purchaseCaption(walletCategory, offer.title, nextWallet[walletCategory])
+    caption: purchaseCaption(offer.title, remaining, currency, walletCategory)
   };
 }
 

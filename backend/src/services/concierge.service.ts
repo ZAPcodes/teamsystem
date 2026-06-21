@@ -109,20 +109,30 @@ async function loadEmployeeContext(employeeId: string, companyId: string) {
 function preferenceGoals(preferences: string[]): Array<{ label: "A" | "B" | "C"; goal: string; title: string }> {
   const primary = preferences[0] ?? "wellness";
   const secondary = preferences[1] ?? "food";
+
+  const goalForPref = (pref: string) => {
+    if (pref === "wellness") return "spa massage yoga or wellness reset this week";
+    if (pref === "food") return "lunch and restaurant food perks in Tirana";
+    if (pref === "travel") return "weekend travel escape or day trip";
+    if (pref === "learning") return "learning course language or workshop class";
+    if (pref === "lifestyle") return "movies cinema entertainment or lifestyle perks";
+    return `${pref} perks that fit my budget`;
+  };
+
   return [
     {
       label: "A",
-      goal: `A ${primary}-focused perk bundle that feels personal`,
+      goal: goalForPref(primary),
       title: `${primary.charAt(0).toUpperCase()}${primary.slice(1)} focus`
     },
     {
       label: "B",
-      goal: `A balanced ${primary} and ${secondary} package for this month`,
+      goal: `balanced ${primary} and ${secondary} perks for this month`,
       title: `${primary} + ${secondary} mix`
     },
     {
       label: "C",
-      goal: "A discovery bundle with the best value picks right now",
+      goal: "best value perks that match my remaining budget",
       title: "Best value discovery"
     }
   ];

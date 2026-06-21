@@ -2,12 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { motion } from "@/lib/motion";
 import { useWrapped } from "@/lib/hooks/use-engagement";
-import { EmployeePageShell, EmployeeDisplayTitle } from "@/components/perx/employee-page-shell";
 import { formatMoney } from "@/lib/utils";
-import { NG } from "@/lib/new-genre/tokens";
 import type { WrappedDTO } from "@/lib/api/contracts";
+import styles from "./wrapped.module.css";
 
 const CATEGORY_LABELS: Record<string, string> = {
   food: "Food",
@@ -15,8 +13,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   lifestyle: "Lifestyle",
   travel: "Travel",
   learning: "Learning",
-  mixed: "Mixed"
+  mixed: "Mixed",
 };
+
+const DELAY_CLASS = [
+  styles.cardDelay0,
+  styles.cardDelay1,
+  styles.cardDelay2,
+  styles.cardDelay3,
+  styles.cardDelay4,
+  styles.cardDelay5,
+] as const;
 
 function formatCategory(category: string) {
   return CATEGORY_LABELS[category.toLowerCase()] ?? category.charAt(0).toUpperCase() + category.slice(1);
@@ -50,403 +57,164 @@ function categoryEmoji(category: string) {
 
 export default function WrappedPage() {
   const { wrapped, loading } = useWrapped();
+  const year = new Date().getFullYear();
 
   if (loading) {
     return (
-      <PageShell>
-        <div
-          style={{
-            height: "280px",
-            borderRadius: "12px",
-            background: "linear-gradient(135deg, rgba(99,91,255,0.08) 0%, rgba(1,1,16,0.04) 100%)"
-          }}
-        />
-      </PageShell>
+      <main className={styles.page}>
+        <div className={styles.inner}>
+          <div className={styles.skeleton} />
+        </div>
+      </main>
     );
   }
 
   if (!wrapped) {
     return (
-      <PageShell>
-        <EmptyWrapped />
-      </PageShell>
+      <main className={styles.page}>
+        <div className={styles.inner}>
+          <Link href="/marketplace" className={styles.back}>
+            ← Marketplace
+          </Link>
+          <EmptyWrapped />
+        </div>
+      </main>
     );
   }
 
   return (
-    <PageShell>
-      <header style={{ marginBottom: "28px" }}>
-        <Link href="/marketplace" className="wrapped-back-link">
+    <main className={styles.page}>
+      <div className={styles.inner}>
+        <Link href="/marketplace" className={styles.back}>
           ← Marketplace
         </Link>
-        <EmployeeDisplayTitle>Your Perx Wrapped.</EmployeeDisplayTitle>
-        <p className="wrapped-intro">
-          A quick recap of the perks you claimed this period — how much you used, what you redeemed, and where your
-          benefits energy went.
-        </p>
-      </header>
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: "easeOut" }}
-        className="wrapped-hero"
-      >
-        <div className="wrapped-hero__glow" aria-hidden="true" />
-        <p className="wrapped-hero__eyebrow">Your persona</p>
-        <h2 className="wrapped-hero__persona">{wrapped.persona}</h2>
-        <p className="wrapped-hero__tagline">{personaTagline(wrapped.persona, wrapped.topCategory)}</p>
-        <div className="wrapped-hero__amount">
-          <span className="wrapped-hero__amount-label">Benefits enjoyed</span>
-          <span className="wrapped-hero__amount-value tabular-nums">
-            {formatMoney(wrapped.savedAmount, wrapped.currency)}
-          </span>
+        <div className={styles.brandRow}>
+          <span className={styles.brand}>Perx Wrapped</span>
+          <span className={styles.year}>{year}</span>
         </div>
-      </motion.div>
 
-      <section className="wrapped-stats" aria-label="Wrapped stats">
-        <StatCard
-          icon={categoryEmoji(wrapped.topCategory)}
-          label="Top category"
-          value={formatCategory(wrapped.topCategory)}
+        <StoryCard
+          delayClass={DELAY_CLASS[0]}
+          className={styles.cardPersona}
+          eyebrow="Your persona"
+          title={wrapped.persona}
+          subtitle={personaTagline(wrapped.persona, wrapped.topCategory)}
         />
-        <StatCard
-          icon="🎟"
-          label="Redemptions"
-          value={String(wrapped.redeemedCount)}
-          hint={wrapped.redeemedCount === 1 ? "voucher scanned" : "vouchers scanned"}
+
+        <StoryCard
+          delayClass={DELAY_CLASS[1]}
+          className={styles.cardSpend}
+          eyebrow="Benefits enjoyed"
+          bigNumber={formatMoney(wrapped.savedAmount, wrapped.currency)}
+          hint="Total perk value claimed this period"
         />
-        <StatCard
-          icon="🗂"
-          label="Categories explored"
-          value={String(wrapped.categoryDiversity)}
-          hint="different perk types"
+
+        <StoryCard
+          delayClass={DELAY_CLASS[2]}
+          className={styles.cardCategory}
+          eyebrow="Top category"
+          emoji={categoryEmoji(wrapped.topCategory)}
+          title={formatCategory(wrapped.topCategory)}
+          hint="Where most of your benefits energy went"
         />
-        <DiversityCard wrapped={wrapped} />
-      </section>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-        className="wrapped-footer"
-      >
-        <p>Ready for the next chapter? Your allowance is still waiting on the marketplace.</p>
-        <Link href="/marketplace" className="ng-box-btn wrapped-footer__cta">
-          Browse perks
-        </Link>
-      </motion.div>
+        <StoryCard
+          delayClass={DELAY_CLASS[3]}
+          className={styles.cardRedeem}
+          eyebrow="Redemptions"
+          bigNumber={String(wrapped.redeemedCount)}
+          hint={wrapped.redeemedCount === 1 ? "voucher scanned at a provider" : "vouchers scanned at providers"}
+        />
 
-      <style jsx>{`
-        .wrapped-back-link {
-          font-family: ${NG.fontBody};
-          font-size: 13px;
-          color: ${NG.slateVeil};
-          text-decoration: none;
-          display: inline-block;
-          margin-bottom: 16px;
-        }
-        .wrapped-intro {
-          font-family: ${NG.fontBody};
-          font-size: 14px;
-          line-height: 1.55;
-          color: ${NG.slateVeil};
-          margin: 0;
-          max-width: 52ch;
-        }
-        .wrapped-hero {
-          position: relative;
-          overflow: hidden;
-          border-radius: 16px;
-          padding: 28px 24px 24px;
-          margin-bottom: 20px;
-          border: 1px solid rgba(99, 91, 255, 0.22);
-          background: linear-gradient(145deg, #0f0f1a 0%, #1a1535 42%, #2d2458 100%);
-          color: #ffffff;
-        }
-        .wrapped-hero__glow {
-          position: absolute;
-          top: -40%;
-          right: -20%;
-          width: 280px;
-          height: 280px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 91, 255, 0.45) 0%, transparent 70%);
-          pointer-events: none;
-        }
-        .wrapped-hero__eyebrow {
-          position: relative;
-          font-family: ${NG.fontBody};
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: rgba(255, 255, 255, 0.55);
-          margin: 0 0 10px;
-        }
-        .wrapped-hero__persona {
-          position: relative;
-          font-family: ${NG.fontDisplay};
-          font-size: clamp(32px, 6vw, 44px);
-          line-height: 1.05;
-          letter-spacing: -0.02em;
-          margin: 0 0 10px;
-        }
-        .wrapped-hero__tagline {
-          position: relative;
-          font-family: ${NG.fontBody};
-          font-size: 14px;
-          line-height: 1.5;
-          color: rgba(255, 255, 255, 0.72);
-          margin: 0 0 24px;
-          max-width: 38ch;
-        }
-        .wrapped-hero__amount {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          padding-top: 18px;
-          border-top: 1px solid rgba(255, 255, 255, 0.14);
-        }
-        .wrapped-hero__amount-label {
-          font-family: ${NG.fontBody};
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-          color: rgba(255, 255, 255, 0.5);
-        }
-        .wrapped-hero__amount-value {
-          font-family: ${NG.fontDisplay};
-          font-size: clamp(28px, 5vw, 36px);
-          letter-spacing: -0.02em;
-        }
-        .wrapped-stats {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 24px;
-        }
-        @media (max-width: 560px) {
-          .wrapped-stats {
-            grid-template-columns: 1fr;
-          }
-        }
-        .wrapped-stat-card {
-          border: 1px solid rgba(1, 1, 16, 0.1);
-          border-radius: 12px;
-          padding: 16px;
-          background: #ffffff;
-          min-height: 108px;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .wrapped-stat-card__icon {
-          font-size: 20px;
-          line-height: 1;
-        }
-        .wrapped-stat-card__label {
-          font-family: ${NG.fontBody};
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          color: ${NG.slateVeil};
-          margin: 0;
-        }
-        .wrapped-stat-card__value {
-          font-family: ${NG.fontDisplay};
-          font-size: 24px;
-          color: ${NG.onyx};
-          margin: 0;
-          line-height: 1.1;
-        }
-        .wrapped-stat-card__hint {
-          font-family: ${NG.fontBody};
-          font-size: 12px;
-          color: ${NG.ashMist};
-          margin: 0;
-        }
-        .wrapped-diversity {
-          grid-column: 1 / -1;
-          border: 1px solid rgba(1, 1, 16, 0.1);
-          border-radius: 12px;
-          padding: 16px 18px;
-          background: linear-gradient(180deg, rgba(99, 91, 255, 0.05) 0%, #ffffff 70%);
-        }
-        .wrapped-diversity__chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-top: 10px;
-        }
-        .wrapped-diversity__chip {
-          font-family: ${NG.fontBody};
-          font-size: 12px;
-          font-weight: 500;
-          padding: 6px 12px;
-          border-radius: 100px;
-          background: rgba(1, 1, 16, 0.06);
-          color: ${NG.onyx};
-        }
-        .wrapped-diversity__chip--active {
-          background: rgba(99, 91, 255, 0.14);
-          color: #4f46e5;
-        }
-        .wrapped-footer {
-          border: 1px solid rgba(1, 1, 16, 0.1);
-          border-radius: 12px;
-          padding: 20px;
-          background: ${NG.cardSurface};
-          display: flex;
-          flex-wrap: wrap;
-          align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-        }
-        .wrapped-footer p {
-          font-family: ${NG.fontBody};
-          font-size: 14px;
-          line-height: 1.5;
-          color: ${NG.slateVeil};
-          margin: 0;
-          max-width: 36ch;
-        }
-        .wrapped-footer__cta {
-          text-decoration: none;
-          white-space: nowrap;
-        }
-        .wrapped-empty {
-          text-align: center;
-          padding: 48px 24px;
-          border: 1px dashed rgba(1, 1, 16, 0.15);
-          border-radius: 12px;
-          background: rgba(99, 91, 255, 0.04);
-        }
-        .wrapped-empty h2 {
-          font-family: ${NG.fontDisplay};
-          font-size: 24px;
-          margin: 0 0 8px;
-          color: ${NG.onyx};
-        }
-        .wrapped-empty p {
-          font-family: ${NG.fontBody};
-          font-size: 14px;
-          color: ${NG.slateVeil};
-          margin: 0 0 20px;
-          line-height: 1.5;
-        }
-      `}</style>
-    </PageShell>
-  );
-}
+        <RangeCard wrapped={wrapped} delayClass={DELAY_CLASS[4]} />
 
-function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <main style={{ backgroundColor: NG.parchment, minHeight: "100vh" }}>
-      <EmployeePageShell narrow>{children}</EmployeePageShell>
+        <div className={styles.ctaCard}>
+          <p className={styles.ctaText}>
+            Ready for the next chapter? Your allowance is still waiting on the marketplace.
+          </p>
+          <Link href="/marketplace" className={styles.ctaButton}>
+            Browse perks
+          </Link>
+        </div>
+      </div>
     </main>
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  hint
+function StoryCard({
+  delayClass,
+  className,
+  eyebrow,
+  title,
+  subtitle,
+  bigNumber,
+  hint,
+  emoji,
 }: {
-  icon: string;
-  label: string;
-  value: string;
+  delayClass: string;
+  className: string;
+  eyebrow: string;
+  title?: string;
+  subtitle?: string;
+  bigNumber?: string;
   hint?: string;
+  emoji?: string;
 }) {
   return (
-    <motion.div
-      className="wrapped-stat-card"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-    >
-      <span className="wrapped-stat-card__icon" aria-hidden="true">
-        {icon}
-      </span>
-      <p className="wrapped-stat-card__label">{label}</p>
-      <p className="wrapped-stat-card__value">{value}</p>
-      {hint ? <p className="wrapped-stat-card__hint">{hint}</p> : null}
-    </motion.div>
+    <article className={`${styles.card} ${delayClass} ${className}`}>
+      <div className={styles.cardGlow} aria-hidden="true" />
+      <p className={styles.cardEyebrow}>{eyebrow}</p>
+      {emoji ? (
+        <span className={styles.emoji} aria-hidden="true">
+          {emoji}
+        </span>
+      ) : null}
+      {title ? <h2 className={styles.cardTitle}>{title}</h2> : null}
+      {bigNumber ? <p className={styles.cardBigNumber}>{bigNumber}</p> : null}
+      {subtitle ? <p className={styles.cardSubtitle}>{subtitle}</p> : null}
+      {hint ? <p className={styles.cardHint}>{hint}</p> : null}
+    </article>
   );
 }
 
-function DiversityCard({ wrapped }: { wrapped: WrappedDTO }) {
+function RangeCard({ wrapped, delayClass }: { wrapped: WrappedDTO; delayClass: string }) {
   const allCategories = ["food", "wellness", "lifestyle", "travel", "learning"];
   const top = wrapped.topCategory.toLowerCase();
-  const extra = Math.max(0, wrapped.categoryDiversity - 1);
 
   return (
-    <motion.div
-      className="wrapped-diversity"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-    >
-      <p className="wrapped-stat-card__label">Your range</p>
-      <p className="wrapped-stat-card__value" style={{ fontSize: "20px" }}>
-        {wrapped.categoryDiversity} perk {wrapped.categoryDiversity === 1 ? "category" : "categories"} explored
-        {extra > 0 ? ` — ${formatCategory(wrapped.topCategory)} plus ${extra} more` : ""}
+    <article className={`${styles.card} ${delayClass} ${styles.cardRange}`}>
+      <div className={styles.cardGlow} aria-hidden="true" />
+      <p className={styles.cardEyebrow}>Your range</p>
+      <p className={styles.cardTitle} style={{ fontSize: "clamp(28px, 7vw, 36px)" }}>
+        {wrapped.categoryDiversity} categories
       </p>
-      <div className="wrapped-diversity__chips">
+      <p className={styles.cardSubtitle}>
+        You explored {wrapped.categoryDiversity} different perk types this period — from{" "}
+        {formatCategory(wrapped.topCategory)} to beyond.
+      </p>
+      <div className={styles.chips}>
         {allCategories.map((cat) => (
-          <span
-            key={cat}
-            className={`wrapped-diversity__chip${cat === top ? " wrapped-diversity__chip--active" : ""}`}
-          >
+          <span key={cat} className={`${styles.chip}${cat === top ? ` ${styles.chipActive}` : ""}`}>
             {categoryEmoji(cat)} {formatCategory(cat)}
           </span>
         ))}
       </div>
-    </motion.div>
+    </article>
   );
 }
 
 function EmptyWrapped() {
   return (
-    <div className="wrapped-empty">
-      <p className="wrapped-hero__eyebrow" style={{ color: NG.slateVeil }}>
-        Perx Wrapped
-      </p>
+    <div className={styles.empty}>
+      <p className={styles.brand}>Perx Wrapped</p>
       <h2>Nothing to wrap yet</h2>
       <p>
-        Claim a perk from the marketplace and your recap will show up here — totals, redemptions, and your benefits
-        persona.
+        Claim a perk from the marketplace and your story will appear here — persona, totals, and category breakdown.
       </p>
-      <Link href="/marketplace" className="ng-box-btn" style={{ textDecoration: "none" }}>
+      <Link href="/marketplace" className={styles.ctaButton}>
         Start on the marketplace
       </Link>
-      <style jsx>{`
-        .wrapped-empty {
-          text-align: center;
-          padding: 48px 24px;
-          border: 1px dashed rgba(1, 1, 16, 0.15);
-          border-radius: 12px;
-          background: rgba(99, 91, 255, 0.04);
-        }
-        .wrapped-empty h2 {
-          font-family: ${NG.fontDisplay};
-          font-size: 24px;
-          margin: 0 0 8px;
-          color: ${NG.onyx};
-        }
-        .wrapped-empty p {
-          font-family: ${NG.fontBody};
-          font-size: 14px;
-          color: ${NG.slateVeil};
-          margin: 0 auto 20px;
-          line-height: 1.5;
-          max-width: 40ch;
-        }
-      `}</style>
     </div>
   );
 }

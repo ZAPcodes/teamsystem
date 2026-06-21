@@ -19,6 +19,32 @@ export async function getOrCreateWallet(
   return wallet;
 }
 
+/**
+ * Ledger wallet is the source of truth for settlement. Company.walletBalance is a
+ * denormalized projection. Top up the ledger wallet when it cannot cover a claim
+ * (employee allowance is checked separately).
+ */
+export async function ensureCompanyWalletFunded(
+  companyId: string,
+  minimumRequired: number,
+  currency: string,
+  actorUserId?: string
+) {
+  const wallet = await getOrCreateWallet("company", companyId, currency);
+
+  if (wallet.balance >= minimumRequired) {
+    const company = await Company.findById(companyId).lean();
+    if (company && company.walletBalance < wallet.balance) {
+      await Company.updateOne({ _id: companyId }, { $set: { walletBalance: wallet.balance } });
+    }
+    return wallet;
+  }
+
+  const shortfall = minimumRequired - wallet.balance;
+  await fundCompanyWallet(companyId, shortfall, currency, actorUserId);
+  return getOrCreateWallet("company", companyId, currency);
+}
+
 async function reconcileWallet(walletId: mongoose.Types.ObjectId) {
   if (!isDevelopment) return;
 

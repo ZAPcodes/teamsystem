@@ -13,6 +13,7 @@ import type { LedgerEntryDTO, PackageDTO, VoucherDTO } from "../../contracts/api
 import { toPackageDTO, toVoucherDTO } from "../mappers/package.mapper.js";
 import {
   fundCompanyWallet,
+  ensureCompanyWalletFunded,
   recordAllowanceHold,
   releaseAllowanceHold,
   settlePackage
@@ -322,14 +323,13 @@ export async function submitPackage(
     throw new ApiError(400, "PACKAGE_NOT_SUBMITTABLE", "Only draft packages can be submitted");
   }
 
-  const [policy, allowance, company] = await Promise.all([
+  const [policy, allowance] = await Promise.all([
     EmployerPolicy.findOne({ companyId: pkg.companyId }).lean(),
-    EmployeeAllowance.findOne({ userId: pkg.employeeId, companyId: pkg.companyId }),
-    Company.findById(pkg.companyId).lean()
+    EmployeeAllowance.findOne({ userId: pkg.employeeId, companyId: pkg.companyId })
   ]);
-  console.log(`[submit:${packageId}] load policy/allowance/company ${elapsed(started)}`);
+  console.log(`[submit:${packageId}] load policy/allowance ${elapsed(started)}`);
 
-  if (!policy || !allowance || !company) {
+  if (!policy || !allowance) {
     throw new ApiError(400, "PACKAGE_NOT_SUBMITTABLE", "Employer policy or allowance is missing");
   }
 
@@ -338,9 +338,8 @@ export async function submitPackage(
     throw new ApiError(400, "INSUFFICIENT_ALLOWANCE", "Package total exceeds available allowance");
   }
 
-  if (company.walletBalance < pkg.totalSnapshot) {
-    throw new ApiError(400, "INSUFFICIENT_COMPANY_BALANCE", "Your employer has not funded enough wallet balance for this package");
-  }
+  const currency = policy.currency ?? pkg.currency;
+  await ensureCompanyWalletFunded(pkg.companyId.toString(), pkg.totalSnapshot, currency);
 
   const lines = await PackageLine.find({ packageId: pkg._id }).lean();
   await assertOffersCompliance(employeeId, pkg.companyId.toString(), lines.map((line) => line.offerId.toString()));

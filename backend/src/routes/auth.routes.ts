@@ -23,6 +23,7 @@ import { EmployeeAllowance } from "../models/EmployeeAllowance.js";
 import { EmployerPolicy } from "../models/EmployerPolicy.js";
 import { Provider } from "../models/Provider.js";
 import { User } from "../models/User.js";
+import { fundCompanyWallet } from "../services/ledger.service.js";
 import { toUserDTO } from "../mappers/user.mapper.js";
 import { initialsForName } from "../utils/identity.js";
 import { nextPeriodReset } from "../utils/period.js";
@@ -117,6 +118,9 @@ authRouter.post(
         autoApproveThreshold: 9_999_999,
         currency: body.currency
       });
+
+      const initialFloat = Math.max(body.employerPolicy.perEmployeeAllowance * 25, 500_000);
+      await fundCompanyWallet(company._id.toString(), initialFloat, body.currency);
     }
 
     if (body.roles.includes("provider") && body.providerProfile) {

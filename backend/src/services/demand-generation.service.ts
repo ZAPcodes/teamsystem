@@ -5,6 +5,7 @@ import { EmployerPolicy } from "../models/EmployerPolicy.js";
 import { Offer } from "../models/Offer.js";
 import { formatMoney } from "../utils/money.js";
 import { env } from "../config/env.js";
+import { inferTopicFromMessage } from "./telegram-topic.service.js";
 
 const STOP_WORDS = new Set([
   "i",
@@ -66,8 +67,23 @@ function tokenize(query: string): string[] {
     .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 }
 
-/** True when at least one meaningful token appears in an active catalog offer. */
+/** True when the catalog likely has offers for this query. */
 export function queryMatchesCatalog(query: string, offers: CatalogOffer[]): boolean {
+  if (offers.length === 0) return false;
+
+  const topic = inferTopicFromMessage(query);
+  if (topic.category) {
+    const inCategory = offers.filter((o) => o.category === topic.category);
+    if (inCategory.length > 0) {
+      for (const term of topic.searchTerms) {
+        if (inCategory.some((o) => `${o.title} ${o.category}`.toLowerCase().includes(term))) {
+          return true;
+        }
+      }
+      return true;
+    }
+  }
+
   const tokens = tokenize(query);
   if (tokens.length === 0) return true;
 

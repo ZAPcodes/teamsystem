@@ -330,6 +330,7 @@ export function PackageBuilderSheet({ open, onClose }: PackageBuilderSheetProps)
                 lines={lines}
                 displayTotal={displayTotal}
                 status="draft"
+                onRemoveLine={removeLine}
               />
             ) : (
               <div style={{

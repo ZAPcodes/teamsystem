@@ -128,20 +128,6 @@ async function seedSettledPackage(
 export async function seedDemoShowcase(ctx: SeedCtx) {
   const { elira, ardit, mira, luan, nora, dritan } = ctx.users;
 
-  // Telegram demo wallets on primary employee
-  await User.updateOne(
-    { _id: elira._id },
-    {
-      $set: {
-        telegramFoodBalance: 4500,
-        telegramWellnessBalance: 1200,
-        telegramLifestyleBalance: 900,
-        telegramTravelBalance: 800,
-        telegramLearningBalance: 4500
-      }
-    }
-  );
-
   // Rich claim history + Wrapped stats (lifestyle, wellness, travel)
   const moviePkg = await seedSettledPackage(ctx, {
     employeeId: elira._id,

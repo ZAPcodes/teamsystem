@@ -94,10 +94,30 @@ export function ConciergeSheet({ open, onClose, launchPrompt }: ConciergeSheetPr
   const materializeBundle = async (result: { packageDraft: PackageDTO; reason: string }) => {
     const offerIds = result.packageDraft.lines.map((l) => l.offerId);
     const catalog = await apiGet<{ offers: OfferDTO[] }>("/offers");
+    const byId = new Map(catalog.offers.map((o) => [o.id, o]));
+
     clear();
     setSource("ai", result.reason);
-    for (const dto of catalog.offers.filter((o) => offerIds.includes(o.id))) {
-      addLine(offerDTOtoOffer(dto));
+
+    for (const line of result.packageDraft.lines) {
+      const dto = byId.get(line.offerId);
+      if (dto) {
+        addLine(offerDTOtoOffer(dto));
+        continue;
+      }
+      addLine({
+        id: line.offerId,
+        provider: { id: line.providerId, name: line.providerName, location: "" },
+        category: "lifestyle",
+        title: line.title,
+        description: line.title,
+        priceALL: line.price,
+        imageUrl: "",
+      });
+    }
+
+    if (offerIds.length > 0 && usePackageStore.getState().lines.length === 0) {
+      throw new Error("Could not load the suggested perks — try asking Bora again.");
     }
   };
 

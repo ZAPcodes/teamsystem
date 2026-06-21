@@ -5,32 +5,15 @@ import { createDraftPackage } from "./package.service.js";
 import type { PackageDTO } from "../../contracts/api.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../http/ApiError.js";
+import { inferTopicFromMessage } from "./telegram-topic.service.js";
 
 type CatalogOffer = {
   _id: unknown;
   title: string;
+  description?: string;
   price: number;
   category: string;
   providerId: unknown;
-};
-
-const FALLBACK_BUNDLES: Record<string, { offerIndices: number[]; reason: string }> = {
-  relax: {
-    offerIndices: [4, 3],
-    reason: "A quiet reset, comfortably under budget."
-  },
-  weekend: {
-    offerIndices: [6, 2],
-    reason: "A coastal escape with a proper lunch — two providers, one tap."
-  },
-  learning: {
-    offerIndices: [8, 9],
-    reason: "A learning push that fits a starter budget."
-  },
-  default: {
-    offerIndices: [2, 12],
-    reason: "Hand-picked perks that match what you asked for."
-  }
 };
 
 const SYSTEM_PROMPT = `You are Bora, the Perx benefits concierge for employees in Albania.
@@ -39,8 +22,9 @@ Return ONLY valid JSON with this exact shape:
 Rules:
 - Pick offer IDs that exist in the catalog only. Never invent IDs.
 - Never compute totals or prices in your response — only pick IDs.
+- Match the employee's exact request (movies → cinema, lunch → food, spa → wellness, etc.).
 - Prefer 1-3 complementary offers from different providers when budget allows.
-- Match the employee goal (relax, food, wellness, travel, learning, etc.).`;
+- If the request mentions a specific venue or perk name, prioritize offers whose title matches.`;
 
 async function loadCatalogForEmployee(employeeId: string, companyId: string, budget?: number) {
   const policy = await EmployerPolicy.findOne({ companyId }).lean();
@@ -64,27 +48,88 @@ async function loadCatalogForEmployee(employeeId: string, companyId: string, bud
   return { offers: offers as CatalogOffer[], maxBudget, policy, available };
 }
 
-function fallbackKey(goal: string) {
-  const g = goal.toLowerCase();
-  if (g.includes("relax") || g.includes("spa") || g.includes("calm")) return "relax";
-  if (g.includes("weekend") || g.includes("travel") || g.includes("coast")) return "weekend";
-  if (g.includes("learn") || g.includes("course") || g.includes("italian")) return "learning";
-  return "default";
+function offerHaystack(offer: CatalogOffer) {
+  return `${offer.title} ${offer.description ?? ""} ${offer.category}`.toLowerCase();
 }
 
-function pickFallbackOffers(offers: CatalogOffer[], maxBudget: number, goal: string) {
-  const template = FALLBACK_BUNDLES[fallbackKey(goal)];
-  const picked = template.offerIndices.map((index) => offers[index]).filter(Boolean);
+export function scoreOfferForGoal(offer: CatalogOffer, goal: string): number {
+  const topic = inferTopicFromMessage(goal);
+  const haystack = offerHaystack(offer);
+  let score = 0;
 
-  let total = picked.reduce((sum, offer) => sum + offer.price, 0);
-  if (total > maxBudget && picked.length > 1) {
-    return [picked[0]];
+  if (topic.category && offer.category === topic.category) {
+    score += 25;
   }
-  if (total > maxBudget) {
-    const single = offers.find((o) => o.price <= maxBudget);
-    return single ? [single] : [];
+
+  for (const term of topic.searchTerms) {
+    if (haystack.includes(term.toLowerCase())) {
+      score += 18;
+    }
   }
+
+  const tokens = goal
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !["the", "and", "for", "with", "this", "that", "week", "need", "want"].includes(w));
+
+  for (const token of tokens) {
+    if (haystack.includes(token)) {
+      score += 10;
+    }
+  }
+
+  return score;
+}
+
+function pickComplementaryOffers(
+  scored: Array<{ offer: CatalogOffer; score: number }>,
+  maxBudget: number,
+  maxItems = 3
+): CatalogOffer[] {
+  const picked: CatalogOffer[] = [];
+  const usedProviders = new Set<string>();
+  let total = 0;
+
+  for (const { offer, score } of scored) {
+    if (score <= 0) continue;
+    const providerKey = String(offer.providerId);
+    if (usedProviders.has(providerKey) && picked.length > 0) continue;
+    if (total + offer.price > maxBudget) continue;
+    picked.push(offer);
+    usedProviders.add(providerKey);
+    total += offer.price;
+    if (picked.length >= maxItems) break;
+  }
+
   return picked;
+}
+
+function pickFallbackOffers(offers: CatalogOffer[], maxBudget: number, goal: string): CatalogOffer[] {
+  const affordable = offers.filter((o) => o.price <= maxBudget);
+  if (affordable.length === 0) return [];
+
+  const scored = affordable
+    .map((offer) => ({ offer, score: scoreOfferForGoal(offer, goal) }))
+    .sort((a, b) => b.score - a.score || a.offer.price - b.offer.price);
+
+  const bestScore = scored[0]?.score ?? 0;
+  if (bestScore > 0) {
+    const bundle = pickComplementaryOffers(scored, maxBudget);
+    if (bundle.length > 0) return bundle;
+    return [scored[0].offer];
+  }
+
+  return [affordable[0]];
+}
+
+function fallbackReason(goal: string, offers: CatalogOffer[]): string {
+  const topic = inferTopicFromMessage(goal);
+  if (topic.label) {
+    const names = offers.map((o) => o.title).join(" + ");
+    return `Matched your ${topic.label} request with ${names}.`;
+  }
+  return `Hand-picked perks that match what you asked for.`;
 }
 
 function extractJson(text: string): { offerIds?: string[]; reason?: string } | null {
@@ -102,11 +147,7 @@ function extractJson(text: string): { offerIds?: string[]; reason?: string } | n
   }
 }
 
-function trimToBudget(
-  offerIds: string[],
-  offers: CatalogOffer[],
-  maxBudget: number
-): string[] {
+function trimToBudget(offerIds: string[], offers: CatalogOffer[], maxBudget: number): string[] {
   let ids = [...offerIds];
   while (ids.length > 0) {
     const total = ids.reduce((sum, id) => {
@@ -126,6 +167,16 @@ function totalForIds(offerIds: string[], offers: CatalogOffer[]) {
   }, 0);
 }
 
+function aiPicksAreRelevant(offerIds: string[], offers: CatalogOffer[], goal: string): boolean {
+  const picked = offerIds
+    .map((id) => offers.find((o) => String(o._id) === id))
+    .filter(Boolean) as CatalogOffer[];
+  if (picked.length === 0) return false;
+
+  const maxScore = Math.max(...picked.map((o) => scoreOfferForGoal(o, goal)));
+  return maxScore >= 10;
+}
+
 async function callGroq(
   goal: string,
   offers: CatalogOffer[],
@@ -133,7 +184,8 @@ async function callGroq(
 ): Promise<{ offerIds: string[]; reason: string } | null> {
   if (!env.GROQ_API_KEY) return null;
 
-  const catalog = offers.slice(0, 50).map((o) => ({
+  const topic = inferTopicFromMessage(goal);
+  const catalog = offers.slice(0, 60).map((o) => ({
     id: String(o._id),
     title: o.title,
     price: o.price,
@@ -148,14 +200,19 @@ async function callGroq(
     },
     body: JSON.stringify({
       model: env.GROQ_MODEL,
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 512,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
-          content: `Employee goal: ${goal}\nMax budget: ${maxBudget} ALL\nCatalog:\n${JSON.stringify(catalog)}`
+          content: `Employee goal: ${goal}
+Inferred category: ${topic.category ?? "unknown"}
+Search hints: ${topic.searchTerms.join(", ") || "none"}
+Max budget: ${maxBudget} ALL
+Catalog:
+${JSON.stringify(catalog)}`
         }
       ]
     })
@@ -179,6 +236,11 @@ async function callGroq(
   const trimmed = trimToBudget(validIds, offers, maxBudget);
   if (trimmed.length === 0) return null;
 
+  if (!aiPicksAreRelevant(trimmed, offers, goal)) {
+    console.warn("[ai] Groq picks low relevance for goal, using semantic fallback");
+    return null;
+  }
+
   return {
     offerIds: trimmed,
     reason: parsed.reason?.trim() || "Composed for you."
@@ -192,7 +254,7 @@ export async function composeAiPackage(
   budget?: number,
   forceFallback = false
 ): Promise<{ packageDraft: PackageDTO; reason: string; fallbackUsed: boolean }> {
-  const { offers, maxBudget, available } = await loadCatalogForEmployee(employeeId, companyId, budget);
+  const { offers, maxBudget } = await loadCatalogForEmployee(employeeId, companyId, budget);
 
   if (maxBudget <= 0) {
     throw new ApiError(400, "INSUFFICIENT_ALLOWANCE", "No budget available for a new bundle");
@@ -215,27 +277,25 @@ export async function composeAiPackage(
         fallbackUsed = false;
       }
     } catch (err) {
-      console.warn("[ai] Groq error, using fallback:", err);
+      console.warn("[ai] Groq error, using semantic fallback:", err);
     }
   }
 
   if (offerIds.length === 0) {
     const picked = pickFallbackOffers(offers, maxBudget, goal);
     if (picked.length === 0) {
-      throw new ApiError(400, "NO_MATCHING_OFFERS", "Nothing fits that budget right now — try a higher amount or a simpler goal.");
+      throw new ApiError(
+        400,
+        "NO_MATCHING_OFFERS",
+        "Nothing fits that budget right now — try a higher amount or a simpler goal."
+      );
     }
     offerIds = picked.map((o) => String(o._id));
-    reason = FALLBACK_BUNDLES[fallbackKey(goal)].reason;
+    reason = fallbackReason(goal, picked);
     fallbackUsed = true;
   }
 
-  const packageDraft = await createDraftPackage(
-    employeeId,
-    companyId,
-    offerIds,
-    "ai",
-    reason
-  );
+  const packageDraft = await createDraftPackage(employeeId, companyId, offerIds, "ai", reason);
 
   return { packageDraft, reason, fallbackUsed };
 }
